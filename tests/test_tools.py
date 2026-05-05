@@ -2,7 +2,6 @@ from pathlib import Path
 
 from cloudbees_agent.tools import (
     GitHubEvidenceTools,
-    clone_lock,
     clone_target_path,
     collect_code_matches,
     compact_code_refs,
@@ -202,12 +201,6 @@ def test_sync_clone_to_sandbox_copies_repo_minus_git(tmp_path):
 
     assert (sandbox / "src" / "agent.py").exists()
     assert not (sandbox / ".git").exists()
-
-
-def test_clone_lock_returns_same_lock_for_same_target(tmp_path):
-    target = tmp_path / "repo"
-
-    assert clone_lock(target) is clone_lock(target)
 
 
 def test_github_evidence_tools_uses_injected_token():

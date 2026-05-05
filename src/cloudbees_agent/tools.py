@@ -3,15 +3,10 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
-from threading import Lock
 from urllib.parse import quote, urlencode, unquote, urlparse
 from urllib.request import Request, urlopen
 
 from cloudbees_agent.models import EvidenceItem, EvidenceResult, ToolName
-
-
-CLONE_LOCKS: dict[Path, Lock] = {}
-CLONE_LOCKS_GUARD = Lock()
 
 
 class GitHubEvidenceTools:
@@ -105,10 +100,9 @@ class GitHubEvidenceTools:
         clone_url = f"https://github.com/{repo}.git"
         cache_target = clone_target_path(repo, self.clone_root)
         sandbox_target = clone_target_path(repo, self.sandbox_root)
-        with clone_lock(cache_target):
-            refresh_clone(clone_url, cache_target)
-            sync_clone_to_sandbox(cache_target, sandbox_target)
-            candidates = collect_code_matches(repo, sandbox_target, terms)
+        refresh_clone(clone_url, cache_target)
+        sync_clone_to_sandbox(cache_target, sandbox_target)
+        candidates = collect_code_matches(repo, sandbox_target, terms)
         items = [
             item
             for _, item in sorted(
@@ -257,15 +251,6 @@ def default_sandbox_root() -> Path:
 def clone_target_path(repo: str, clone_root: Path) -> Path:
     """Map owner/name to a repo-specific clone directory under clone_root."""
     return clone_root / repo.replace("/", "-")
-
-
-def clone_lock(target: Path) -> Lock:
-    """Return a per-target lock so local clone refresh and search are serialized."""
-    key = target.resolve()
-    with CLONE_LOCKS_GUARD:
-        if key not in CLONE_LOCKS:
-            CLONE_LOCKS[key] = Lock()
-        return CLONE_LOCKS[key]
 
 
 def refresh_clone(clone_url: str, target: Path) -> None:
