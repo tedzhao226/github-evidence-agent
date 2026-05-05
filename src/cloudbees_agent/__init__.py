@@ -1,4 +1,4 @@
-"""CloudBees assessment GitHub evidence agent."""
+"""GitHub evidence agent CLI."""
 
 __all__ = ["__version__"]
 

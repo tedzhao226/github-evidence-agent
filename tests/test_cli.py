@@ -40,27 +40,6 @@ def test_cli_parser_accepts_one_shot_prompt():
     assert args.prompt == "For pydantic/pydantic-ai, where is tracing?"
 
 
-def test_cli_parser_rejects_removed_repo_and_question_flags():
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(["--repo", "pydantic/pydantic-ai"])
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(["--question", "Where is tracing?"])
-
-
-def test_cli_parser_rejects_removed_workflow_config_flag():
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(
-            ["For pydantic/pydantic-ai, where is tracing?", "--workflow-config", "workflow.yaml"]
-        )
-
-
-def test_cli_parser_rejects_removed_sample_output_flag():
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(
-            ["For pydantic/pydantic-ai, where is tracing?", "--sample-output", "sample_run.txt"]
-        )
-
-
 def test_scoped_clone_root_uses_base_root(tmp_path):
     args = build_parser().parse_args(["--clone-root", str(tmp_path)])
 

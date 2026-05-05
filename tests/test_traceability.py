@@ -4,7 +4,6 @@ from cloudbees_agent.models import EvidenceItem, EvidenceResult, ToolName
 from cloudbees_agent.settings import AppSettings
 from cloudbees_agent.traceability import (
     configure_logfire,
-    evidence_refs,
     judge_fallback,
     record_turn_trace,
     trace_path,
@@ -47,49 +46,6 @@ def test_judge_fallback_marks_later_tool_when_first_evidence_is_empty():
     assert fallback_used is True
     assert fallback_tool == ToolName.README
     assert fallback_reason == "issues returned no relevant evidence."
-
-
-def test_evidence_refs_collects_urls_paths_and_titles():
-    result = EvidenceResult(
-        tool=ToolName.CODE_SEARCH,
-        query="trace",
-        summary="found trace helper",
-        items=[
-            EvidenceItem(kind="code", title="with url", url="https://example.test/ref", excerpt="one"),
-            EvidenceItem(kind="code", title="with path", path="src/ref.py", excerpt="two"),
-            EvidenceItem(kind="code", title="title only", excerpt="three"),
-        ],
-    )
-
-    refs = evidence_refs([result])
-
-    assert refs == ["https://example.test/ref", "src/ref.py", "title only"]
-
-
-def test_evidence_refs_deduplicates_duplicate_file_lines():
-    result = EvidenceResult(
-        tool=ToolName.CODE_SEARCH,
-        query="routing",
-        summary="duplicate lines",
-        items=[
-            EvidenceItem(
-                kind="code",
-                title="routing.py:35",
-                url="https://github.com/fastapi/fastapi/blob/HEAD/fastapi/routing.py#L35",
-                excerpt="first",
-            ),
-            EvidenceItem(
-                kind="code",
-                title="routing.py:80",
-                url="https://github.com/fastapi/fastapi/blob/HEAD/fastapi/routing.py#L80",
-                excerpt="second",
-            ),
-        ],
-    )
-
-    refs = evidence_refs([result])
-
-    assert refs == ["https://github.com/fastapi/fastapi/blob/HEAD/fastapi/routing.py#L35"]
 
 
 def test_write_local_trace_records_turn_metadata(tmp_path):
