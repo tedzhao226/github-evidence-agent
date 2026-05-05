@@ -1,4 +1,4 @@
-# CloudBees Agentic Software Engineer Assessment
+# GitHub Evidence Agent — Specs
 
 ## Product
 
@@ -46,7 +46,7 @@ Logfire spans should wrap each agent turn and each tool call.
 
 ## CLI Behavior
 
-`cloudbees-agent` starts a chat loop.
+`make chat` starts a chat loop.
 The user can keep asking questions until `/exit` or `/quit`.
 The first user message must mention a repository as `owner/name` or a GitHub URL.
 If a later message mentions a different repository, the CLI switches the active repository and keeps the same conversation history.
@@ -61,7 +61,7 @@ The chat loop supports:
 - `/exit`: leave the loop.
 - `/quit`: leave the loop.
 
-`cloudbees-agent "For owner/name, ..."` runs one turn and exits.
+`make run PROMPT="For owner/name, ..."` runs one turn and exits.
 This mode is used by `make run` and `make sample`.
 
 ## Eval Design
@@ -130,7 +130,5 @@ Example: issue search returns no relevant issues for an observability question, 
 
 ## Reference
 
-- [Assignment prompt](inbox/CloudBees%20-%20Conversation%20Starter%20-%20Agentic%20Software%20Engineer.md)
-- [Original PDF](inbox/CloudBees%20-%20Conversation%20Starter%20-%20Agentic%20Software%20Engineer.pdf)
 - [Pydantic AI Logfire docs](https://pydantic.dev/docs/ai/integrations/logfire/)
 - [Pydantic Logfire getting started](https://pydantic.dev/docs/logfire/get-started/)

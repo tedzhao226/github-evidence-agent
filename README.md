@@ -1,4 +1,4 @@
-# CloudBees GitHub Evidence Agent
+# GitHub Evidence Agent
 
 This is a small CLI for repository code research.
 Given a public GitHub repository, it runs a long-running chat session, calls read-only evidence tools, and answers from the collected evidence.
@@ -20,8 +20,8 @@ The implementation uses Pydantic AI with OpenAI when credentials are present, an
 ## Demo
 
 ```bash
-cloudbees-agent
-For fastapi/fastapi, where is routing implemented?
+make chat
+# then ask: For fastapi/fastapi, where is routing implemented?
 ```
 
 ![chat cli demo](docs/imgs/chat-cli.png)
@@ -75,8 +75,8 @@ Values are parsed once through the Pydantic settings loader.
 
 The CLI has two modes.
 
-- `cloudbees-agent` starts a chat loop.
-- `cloudbees-agent "For owner/name, ..."` runs one turn.
+- `make chat` starts a chat loop.
+- `make run PROMPT="For owner/name, ..."` runs one turn.
 
 In chat mode, use:
 
