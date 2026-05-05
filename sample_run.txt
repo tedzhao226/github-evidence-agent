@@ -7,42 +7,47 @@ make run PROMPT="For pydantic/pydantic-ai, how does this repository support obse
 ```text
 Running tool: readme
 Running tool: code_search
-Tool calls: readme, code_search
+Running tool: code_search
+Running tool: code_search
+Running tool: code_search
+Running tool: code_search
+Tool calls: readme, code_search, code_search, code_search, code_search, code_search
 
 Answer:
-Short answer
-- The project emits OpenTelemetry traces and integrates with Pydantic Logfire (their OTel observability backend). Tracing is surfaced in docs (evals & HTTPX instrumentation) and is wired into the graph code via helper utilities (AbstractSpan, get_traceparent, logfire_span).
-
-Where this is documented (evidence)
-- README: promises "Seamless Observability" and "Tightly integrates ... with Pydantic Logfire" (README links shown in the repo) — see the README entries returned by the readme search.
-- docs/evals/how-to/logfire-integration.md: "Pydantic Evals uses OpenTelemetry to record traces of the evaluation process." (docs/evals/how-to/logfire-integration.md)
-- docs/retries.md: notes that with HTTPX instrumentation enabled, retry attempts are automatically captured in traces (docs/retries.md#L326).
-
-Where it’s implemented (evidence)
-- The graph modules import observability helpers from an internal utils module:
-  - pydantic_graph/pydantic_graph/graph.py imports AbstractSpan, get_traceparent, logfire_span (pydantic_graph/pydantic_graph/graph.py:16).
-  - pydantic_graph/pydantic_graph/beta/graph.py does the same (pydantic_graph/pydantic_graph/beta/graph.py:22).
-- These imports indicate the tracing helpers are implemented in pydantic_graph/pydantic_graph/_utils.py (the graph files import from ._utils).
-
-Notes / caveats
-- I inspected documentation and the import sites; I did not open the _utils.py file itself in this query, so the exact implementation details (function bodies / how they call OTel APIs) live in pydantic_graph/pydantic_graph/_utils.py but were not fetched here. If you want, I can open that file to show the concrete code paths and OTel calls.
+The agent reached the tool-call limit, so this answer is based on collected evidence: readme README: 3. **Seamless Observability**: (https://github.com/pydantic/pydantic-ai#readme) readme README: Tightly [integrates](https://ai.pydantic.dev/logfire) with [Pydantic Logfire](https://pydantic.dev/logfire), our general-purpose OpenTelemetry observability platform, for real-time debugging, evals-based performance monitoring, and behavior, tracing, and cost tracking. If you already have an observability platform that supports OTel, you can [use that too](https://ai.pydantic.dev/logfire#alternative-observability-backends). (https://github.com/pydantic/pydantic-ai#readme) code_search pydantic_graph/pydantic_graph/graph.py:16: from ._utils import AbstractSpan, get_traceparent, logfire_span (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_graph/pydantic_graph/graph.py#L16) code_search pydantic_graph/pydantic_graph/beta/graph.py:22: from pydantic_graph._utils import AbstractSpan, get_traceparent, infer_obj_name, logfire_span (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_graph/pydantic_graph/beta/graph.py#L22) code_search pydantic_graph/pydantic_graph/beta/graph.py:22: from pydantic_graph._utils import AbstractSpan, get_traceparent, infer_obj_name, logfire_span (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_graph/pydantic_graph/beta/graph.py#L22)
 
 Evidence refs:
 - https://github.com/pydantic/pydantic-ai#readme
 
 Code refs:
-- docs/retries.md:326
-- docs/evals/how-to/logfire-integration.md:7
 - pydantic_graph/pydantic_graph/graph.py:16
 - pydantic_graph/pydantic_graph/beta/graph.py:22
-- docs/mcp/overview.md:22
-- pydantic_evals/pydantic_evals/otel/_context_in_memory_span_exporter.py:11
 - docs/version-policy.md:15
-- pydantic_graph/pydantic_graph/beta/graph_builder.py:95
+- docs/contributing.md:7
+- CONTRIBUTING.md:7
+- pydantic_ai_slim/pydantic_ai/.agents/skills/building-pydantic-ai-agents/references/TESTING-AND-DEBUGGING.md:60
+- docs/gateway.md:8
+- docs/direct.md:105
+- pydantic_graph/pydantic_graph/_utils.py:22
+- pydantic_evals/pydantic_evals/online.py:44
+- pydantic_evals/pydantic_evals/evaluators/_run_evaluator.py:13
+- pydantic_ai_slim/pydantic_ai/models/instrumented.py:158
+- pydantic_ai_slim/pydantic_ai/_utils.py:30
+- pydantic_evals/pydantic_evals/_utils.py:25
+- pydantic_evals/pydantic_evals/_otel_emit.py:9
+- docs/mcp/client.md:80
+- docs/logfire.md:62
+- scripts/check_cassettes.py:6
+- pydantic_graph/pydantic_graph/persistence/file.py:157
+- pydantic_ai_slim/pydantic_ai/embeddings/instrumented.py:1
+- pydantic_ai_slim/pydantic_ai/durable_exec/temporal/_logfire.py:1
+- pydantic_ai_slim/pydantic_ai/_instrumentation.py:1
+- examples/pydantic_ai_examples/slack_lead_qualifier/store.py:1
+- examples/pydantic_ai_examples/slack_lead_qualifier/functions.py:1
 
 Fallback used: False
-Session ID: 20260505T082424Z-de50b2d0
-Trace JSON: traces/20260505T082424Z-de50b2d0/pydantic-pydantic-ai-turn-1-20260505T082439Z.json
+Session ID: 20260505T112044Z-119760dd
+Trace JSON: traces/20260505T112044Z-119760dd/pydantic-pydantic-ai-turn-1-20260505T112101Z.json
 
 ```
 
@@ -59,83 +64,96 @@ Try these example prompts:
   1. For fastapi/fastapi, what is this repository about?
   2. For fastapi/fastapi, where is routing implemented?
   3. For fastapi/fastapi, what recent issues mention tracing, and what commits touched related code paths?
-Session ID: 20260505T082441Z-09180835
+Session ID: 20260505T112102Z-f72dfe8f
 Type /help for commands.
 cloudbees-agent> Using repository: pydantic/pydantic-ai
 Running tool: readme
 Running tool: code_search
-Running tool: code_search
-Running tool: code_search
-Running tool: readme
-Running tool: code_search
-Tool calls: readme, code_search, code_search, code_search, readme, code_search
+Running tool: issues
+Tool calls: code_search, issues, readme
 
 Answer:
-The agent reached the tool-call limit, so this answer is based on collected evidence: readme README: <a href="https://logfire.pydantic.dev/docs/join-slack/"><img src="https://img.shields.io/badge/Slack-Join%20Slack-4A154B?logo=slack" alt="Join Slack" /></a> (https://github.com/pydantic/pydantic-ai#readme) readme README: Yet despite virtually every Python agent framework and LLM library using Pydantic Validation, when we began to use LLMs in [Pydantic Logfire](https://pydantic.dev/logfire), we couldn't find anything that gave us the same feeling. (https://github.com/pydantic/pydantic-ai#readme) code_search pydantic_graph/pydantic_graph/graph.py:16: from ._utils import AbstractSpan, get_traceparent, logfire_span (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_graph/pydantic_graph/graph.py#L16) code_search pydantic_graph/pydantic_graph/beta/graph.py:22: from pydantic_graph._utils import AbstractSpan, get_traceparent, infer_obj_name, logfire_span (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_graph/pydantic_graph/beta/graph.py#L22) code_search pydantic_graph/pydantic_graph/graph.py:16: from ._utils import AbstractSpan, get_traceparent, logfire_span (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_graph/pydantic_graph/graph.py#L16)
+Short answer
+- pydantic-ai instruments LLM/agent runs with OpenTelemetry and ships an opinionated observability integration called "Pydantic Logfire" (an OTel-based platform). It also exposes OTEL-compatible traces so you can send trace data to other OTel backends.
+
+Evidence and where to look
+- README: "Seamless Observability" — "Tightly integrates with Pydantic Logfire, our general-purpose OpenTelemetry observability platform... If you already have an observability platform that supports OTel, you can use that too." (README section: "Seamless Observability")  
+  (see README entry in the repo)
+- Docs: evals use OpenTelemetry — docs/evals/how-to/logfire-integration.md explicitly states Pydantic Evals uses OpenTelemetry to record traces containing evaluation reports and full execution traces. (docs/evals/how-to/logfire-integration.md)
+- Code-level hooks:
+  - pydantic_graph imports tracing helpers: pydantic_graph/pydantic_graph/graph.py (imports AbstractSpan, get_traceparent, logfire_span). (pydantic_graph/pydantic_graph/graph.py)
+  - pydantic_evals contains an OpenTelemetry span exporter implementation: pydantic_evals/pydantic_evals/otel/_context_in_memory_span_exporter.py (imports opentelemetry.sdk.trace.ReadableSpan). (pydantic_evals/pydantic_evals/otel/_context_in_memory_span_exporter.py)
+- Other instrumentation notes:
+  - docs/retries.md notes that with HTTPX instrumentation enabled, retry attempts are captured in traces (i.e., HTTP/transport-level spans are included). (docs/retries.md)
+
+Known gaps / user questions
+- Some users have asked about enabling OpenTelemetry/Langfuse tracing for specific agents (TemporalAgent) and about integrations with LangSmith or W&B — indicating there are community/feature questions about how to route certain agent traces to external tracing backends or visualizers. See issues: #3580 (TemporalAgent + OTEL), #3061 (LangSmith), #1743 (W&B Weave), and discussion about using traces for RL training (#2202).
+
+Summary
+- The repo uses OpenTelemetry for tracing, provides Logfire as a first-class/trusted backend, includes OTEL-compatible exporters/instrumentation in code paths (evals, graph, HTTPX), and is intended to work with other OTel-compatible observability backends — although some agent-specific routing/integration questions remain open in issues.
 
 Evidence refs:
+- https://github.com/pydantic/pydantic-ai/issues/2202
+- https://github.com/pydantic/pydantic-ai/issues/3580
+- https://github.com/pydantic/pydantic-ai/issues/3061
+- https://github.com/pydantic/pydantic-ai/issues/1743
 - https://github.com/pydantic/pydantic-ai#readme
 
 Code refs:
+- docs/evals/how-to/logfire-integration.md:7
+- docs/retries.md:326
 - pydantic_graph/pydantic_graph/graph.py:16
 - pydantic_graph/pydantic_graph/beta/graph.py:22
-- docs/version-policy.md:15
-- docs/mcp/overview.md:22
-- docs/contributing.md:7
-- CONTRIBUTING.md:7
-- .github/ISSUE_TEMPLATE/bug.yaml:32
-- pydantic_ai_slim/pydantic_ai/models/instrumented.py:13
-- docs/multi-agent-applications.md:372
-- pydantic_graph/pydantic_graph/beta/graph_builder.py:95
-- pydantic_ai_slim/pydantic_ai/embeddings/instrumented.py:11
-- pydantic_ai_slim/pydantic_ai/embeddings/__init__.py:143
-- pydantic_ai_slim/pydantic_ai/direct.py:96
-- pydantic_ai_slim/pydantic_ai/_instrumentation.py:6
 - pydantic_evals/pydantic_evals/otel/_context_in_memory_span_exporter.py:11
 - pydantic_ai_slim/pydantic_ai/tool_manager.py:11
-- pydantic_ai_slim/pydantic_ai/durable_exec/temporal/_logfire.py:7
-- pydantic_graph/pydantic_graph/_utils.py:22
-- pydantic_evals/pydantic_evals/online.py:44
-- pydantic_evals/pydantic_evals/evaluators/_run_evaluator.py:13
-- pydantic_ai_slim/pydantic_ai/_utils.py:30
-- pydantic_graph/pydantic_graph/persistence/in_mem.py:26
-- pydantic_graph/pydantic_graph/persistence/file.py:14
-- pydantic_graph/pydantic_graph/persistence/__init__.py:13
+- pydantic_ai_slim/pydantic_ai/models/instrumented.py:13
+- pydantic_ai_slim/pydantic_ai/embeddings/instrumented.py:11
 
 Fallback used: False
-Session ID: 20260505T082441Z-09180835
-Trace JSON: traces/20260505T082441Z-09180835/pydantic-pydantic-ai-turn-1-20260505T082453Z.json
+Session ID: 20260505T112102Z-f72dfe8f
+Trace JSON: traces/20260505T112102Z-f72dfe8f/pydantic-pydantic-ai-turn-1-20260505T112126Z.json
 
-cloudbees-agent> Running tool: readme
+cloudbees-agent> Running tool: code_search
 Running tool: code_search
-Tool calls: code_search, readme
+Running tool: code_search
+Running tool: code_search
+Running tool: code_search
+Running tool: code_search
+Tool calls: code_search, code_search, code_search, code_search, code_search, code_search
 
 Answer:
-The most relevant implementation file appears to be:
-- pydantic_ai_slim/pydantic_ai/models/instrumented.py
-  (see code search hit: pydantic_ai_slim/pydantic_ai/models/instrumented.py:24 — imports pydantic_ai._instrumentation)
-
-Related implementation files you may also want:
-- pydantic_ai_slim/pydantic_ai/embeddings/instrumented.py
-- pydantic_ai_slim/pydantic_ai/agent/__init__.py
-
-I based this on a repository code search (search hits listed above). If you want, I can open any of those files and show the contents or point to specific implementation details.
+The agent reached the tool-call limit, so this answer is based on collected evidence: code_search examples/pydantic_ai_examples/slack_lead_qualifier/agent.py:30: • **Pydantic Logfire** – Observability for traces, logs & metrics with first-class AI support (commercial) (https://github.com/pydantic/pydantic-ai/blob/HEAD/examples/pydantic_ai_examples/slack_lead_qualifier/agent.py#L30) code_search pydantic_ai_slim/pydantic_ai/models/instrumented.py:8: from dataclasses import dataclass, field (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_ai_slim/pydantic_ai/models/instrumented.py#L8) code_search examples/pydantic_ai_examples/slack_lead_qualifier/agent.py:30: • **Pydantic Logfire** – Observability for traces, logs & metrics with first-class AI support (commercial) (https://github.com/pydantic/pydantic-ai/blob/HEAD/examples/pydantic_ai_examples/slack_lead_qualifier/agent.py#L30) code_search pydantic_ai_slim/pydantic_ai/models/instrumented.py:8: from dataclasses import dataclass, field (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_ai_slim/pydantic_ai/models/instrumented.py#L8) code_search pydantic_ai_slim/pydantic_ai/toolsets/deferred_loading.py:3: from dataclasses import dataclass, field, replace (https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_ai_slim/pydantic_ai/toolsets/deferred_loading.py#L3)
 
 Evidence refs:
 - none
 
 Code refs:
-- pydantic_ai_slim/pydantic_ai/models/instrumented.py:24
-- pydantic_ai_slim/pydantic_ai/embeddings/instrumented.py:13
-- pydantic_ai_slim/pydantic_ai/durable_exec/temporal/_logfire.py:18
-- pydantic_ai_slim/pydantic_ai/agent/__init__.py:24
-- pydantic_ai_slim/pydantic_ai/_run_context.py:13
-- pydantic_ai_slim/pydantic_ai/_output.py:15
-- pydantic_ai_slim/pydantic_ai/_instrumentation.py:51
-- docs/logfire.md:64
+- examples/pydantic_ai_examples/slack_lead_qualifier/agent.py:30
+- pydantic_ai_slim/pydantic_ai/models/instrumented.py:8
+- pydantic_ai_slim/pydantic_ai/embeddings/instrumented.py:7
+- pydantic_ai_slim/pydantic_ai/_instrumentation.py:3
+- pydantic_evals/pydantic_evals/evaluators/_run_evaluator.py:13
+- pydantic_ai_slim/pydantic_ai/toolsets/deferred_loading.py:3
+- scripts/verify_vertex_gcs_tool_result.py:16
+- scripts/verify_vertex_gcs_all_types.py:22
+- pydantic_evals/pydantic_evals/otel/_context_in_memory_span_exporter.py:6
+- scripts/verify_vertex_gcs.py:22
+- scripts/verify_bedrock_access.py:13
+- scripts/upload_test_files.py:16
+- scripts/check_cassettes.py:16
+- pydantic_graph/pydantic_graph/graph.py:16
+- pydantic_graph/pydantic_graph/beta/graph.py:22
+- pydantic_graph/pydantic_graph/_utils.py:156
+- pydantic_evals/pydantic_evals/online.py:44
+- pydantic_evals/pydantic_evals/dataset.py:38
+- pydantic_evals/pydantic_evals/_utils.py:124
+- pydantic_evals/pydantic_evals/_otel_emit.py:9
+- docs/logfire.md:115
+- pydantic_ai_slim/pydantic_ai/durable_exec/temporal/_logfire.py:14
+- pydantic_ai_slim/pydantic_ai/durable_exec/temporal/__init__.py:17
 
 Fallback used: False
-Session ID: 20260505T082441Z-09180835
-Trace JSON: traces/20260505T082441Z-09180835/pydantic-pydantic-ai-turn-2-20260505T082503Z.json
+Session ID: 20260505T112102Z-f72dfe8f
+Trace JSON: traces/20260505T112102Z-f72dfe8f/pydantic-pydantic-ai-turn-2-20260505T112153Z.json
 
 cloudbees-agent> ```
