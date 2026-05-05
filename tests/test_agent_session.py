@@ -87,13 +87,20 @@ def tool_sequence_model(tool_queries: list[tuple[str, str]]) -> FunctionModel:
     return FunctionModel(call_next)
 
 
-def test_tool_call_recorder_records_evidence_and_returns_model_text(monkeypatch):
+def test_call_tool_records_evidence_and_returns_model_text(monkeypatch, tmp_path):
     monkeypatch.setattr("cloudbees_agent.agent.trace_span", lambda *args, **kwargs: nullcontext())
     result = evidence(ToolName.README, "README documents Logfire tracing.")
     tools = FakeTools({ToolName.README: result})
+    session = AgentSession(
+        tools=tools,
+        settings=settings_for_test(),
+        trace_dir=tmp_path,
+        model=tool_sequence_model([("readme", "tracing")]),
+        session_id="test-session",
+    )
     recorder = ToolCallRecorder(repo="pydantic/pydantic-ai")
 
-    model_text = recorder.run_tool(ToolName.README, "tracing", tools.readme)
+    model_text = session._call_tool(ToolName.README, "tracing", recorder)
 
     assert "README documents Logfire tracing." in model_text
     assert tools.calls == [(ToolName.README, "pydantic/pydantic-ai", "tracing")]

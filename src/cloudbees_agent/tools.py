@@ -365,6 +365,17 @@ def summarize_items(items: list[EvidenceItem]) -> str:
     return " | ".join(item.excerpt for item in items[:3])
 
 
+def summarize_tool_result(result: EvidenceResult) -> str:
+    """Return compact text for the model after a tool call."""
+    if not result.items:
+        return f"{result.tool.value} found no relevant evidence."
+    lines = [f"{result.tool.value} found {len(result.items)} item(s):"]
+    for item in result.items[:5]:
+        ref = item.url or item.path or item.title
+        lines.append(f"- {item.title}: {item.excerpt} ({ref})")
+    return "\n".join(lines)
+
+
 def iter_source_files(root: Path) -> Iterable[Path]:
     """Yield searchable source/doc files while skipping generated or vendor paths."""
     ignored = {
