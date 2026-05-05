@@ -1,0 +1,237 @@
+[
+  {
+    "name": "readme overview observability",
+    "repo": "pydantic/pydantic-ai",
+    "question": "How does this repository support observability?",
+    "mocked_outputs": {
+      "readme": {
+        "tool": "readme",
+        "query": "observability logfire",
+        "summary": "Logfire tracing is documented in the README.",
+        "items": [
+          {
+            "kind": "readme",
+            "title": "README",
+            "url": "https://github.com/pydantic/pydantic-ai#readme",
+            "excerpt": "Logfire tracing is documented in the README."
+          }
+        ]
+      },
+      "code_search": {
+        "tool": "code_search",
+        "query": "observability",
+        "summary": "",
+        "items": []
+      }
+    },
+    "expected_first_tool": "readme",
+    "expected_fallback": null,
+    "required_evidence_fields": ["url", "excerpt"]
+  },
+  {
+    "name": "code search implementation location",
+    "repo": "pydantic/pydantic-ai",
+    "question": "Where is tracing implemented?",
+    "mocked_outputs": {
+      "code_search": {
+        "tool": "code_search",
+        "query": "tracing logfire",
+        "summary": "instrument_pydantic_ai appears in logfire integration code.",
+        "items": [
+          {
+            "kind": "code",
+            "title": "pydantic_ai/logfire.py:12",
+            "url": "https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_ai/logfire.py#L12",
+            "path": "pydantic_ai/logfire.py",
+            "excerpt": "instrument_pydantic_ai appears in logfire integration code."
+          }
+        ]
+      },
+      "readme": {
+        "tool": "readme",
+        "query": "tracing",
+        "summary": "",
+        "items": []
+      }
+    },
+    "expected_first_tool": "code_search",
+    "expected_fallback": null,
+    "required_evidence_fields": ["url", "path", "excerpt"]
+  },
+  {
+    "name": "issues failure fallback readme",
+    "repo": "pydantic/pydantic-ai",
+    "question": "Are there issue reports about tracing?",
+    "mocked_outputs": {
+      "issues": {
+        "tool": "issues",
+        "query": "repo:pydantic/pydantic-ai tracing",
+        "summary": "",
+        "items": []
+      },
+      "readme": {
+        "tool": "readme",
+        "query": "tracing",
+        "summary": "README points users to Logfire for tracing.",
+        "items": [
+          {
+            "kind": "readme",
+            "title": "README",
+            "url": "https://github.com/pydantic/pydantic-ai#readme",
+            "excerpt": "README points users to Logfire for tracing."
+          }
+        ]
+      }
+    },
+    "expected_first_tool": "issues",
+    "expected_fallback": "readme",
+    "required_evidence_fields": ["url", "excerpt"]
+  },
+  {
+    "name": "commits recent change",
+    "repo": "pydantic/pydantic-ai",
+    "question": "What recent commit changed tracing docs?",
+    "mocked_outputs": {
+      "commits": {
+        "tool": "commits",
+        "query": "recent commit tracing",
+        "summary": "docs: mention Logfire tracing setup",
+        "items": [
+          {
+            "kind": "commit",
+            "title": "docs: mention Logfire tracing setup",
+            "url": "https://github.com/pydantic/pydantic-ai/commit/example",
+            "excerpt": "docs: mention Logfire tracing setup"
+          }
+        ]
+      },
+      "code_search": {
+        "tool": "code_search",
+        "query": "tracing",
+        "summary": "",
+        "items": []
+      }
+    },
+    "expected_first_tool": "commits",
+    "expected_fallback": null,
+    "required_evidence_fields": ["url", "excerpt"]
+  },
+  {
+    "name": "commits empty fallback code",
+    "repo": "pydantic/pydantic-ai",
+    "question": "What recent commit changed agent tracing internals?",
+    "mocked_outputs": {
+      "commits": {
+        "tool": "commits",
+        "query": "recent commit tracing internals",
+        "summary": "",
+        "items": []
+      },
+      "code_search": {
+        "tool": "code_search",
+        "query": "tracing internals",
+        "summary": "Tracing internals are visible in instrumentation code.",
+        "items": [
+          {
+            "kind": "code",
+            "title": "pydantic_ai/_instrumentation.py:30",
+            "url": "https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_ai/_instrumentation.py#L30",
+            "path": "pydantic_ai/_instrumentation.py",
+            "excerpt": "Tracing internals are visible in instrumentation code."
+          }
+        ]
+      }
+    },
+    "expected_first_tool": "commits",
+    "expected_fallback": "code_search",
+    "required_evidence_fields": ["url", "path", "excerpt"]
+  },
+  {
+    "name": "readme empty fallback code",
+    "repo": "pydantic/pydantic-ai",
+    "question": "How are agent spans emitted?",
+    "mocked_outputs": {
+      "readme": {
+        "tool": "readme",
+        "query": "agent spans",
+        "summary": "",
+        "items": []
+      },
+      "code_search": {
+        "tool": "code_search",
+        "query": "agent spans",
+        "summary": "span emission appears near agent run instrumentation.",
+        "items": [
+          {
+            "kind": "code",
+            "title": "pydantic_ai/agent.py:50",
+            "url": "https://github.com/pydantic/pydantic-ai/blob/HEAD/pydantic_ai/agent.py#L50",
+            "path": "pydantic_ai/agent.py",
+            "excerpt": "span emission appears near agent run instrumentation."
+          }
+        ]
+      }
+    },
+    "expected_first_tool": "readme",
+    "expected_fallback": "code_search",
+    "required_evidence_fields": ["url", "path", "excerpt"]
+  },
+  {
+    "name": "issues useful discussion",
+    "repo": "pydantic/pydantic-ai",
+    "question": "Is there a reported issue about tracing setup?",
+    "mocked_outputs": {
+      "issues": {
+        "tool": "issues",
+        "query": "repo:pydantic/pydantic-ai tracing setup",
+        "summary": "Issue discusses tracing setup failure.",
+        "items": [
+          {
+            "kind": "issue",
+            "title": "Tracing setup failure",
+            "url": "https://github.com/pydantic/pydantic-ai/issues/1",
+            "excerpt": "Issue discusses tracing setup failure."
+          }
+        ]
+      },
+      "readme": {
+        "tool": "readme",
+        "query": "tracing",
+        "summary": "",
+        "items": []
+      }
+    },
+    "expected_first_tool": "issues",
+    "expected_fallback": null,
+    "required_evidence_fields": ["url", "excerpt"]
+  },
+  {
+    "name": "code empty fallback readme",
+    "repo": "pydantic/pydantic-ai",
+    "question": "Where is observability described?",
+    "mocked_outputs": {
+      "code_search": {
+        "tool": "code_search",
+        "query": "observability",
+        "summary": "",
+        "items": []
+      },
+      "readme": {
+        "tool": "readme",
+        "query": "observability",
+        "summary": "Observability is described with Logfire references.",
+        "items": [
+          {
+            "kind": "readme",
+            "title": "README",
+            "url": "https://github.com/pydantic/pydantic-ai#readme",
+            "excerpt": "Observability is described with Logfire references."
+          }
+        ]
+      }
+    },
+    "expected_first_tool": "code_search",
+    "expected_fallback": "readme",
+    "required_evidence_fields": ["url", "excerpt"]
+  }
+]
