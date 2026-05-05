@@ -30,6 +30,7 @@ The sample repository is `pydantic/pydantic-ai` because it connects naturally to
 - Quiet chat output via `LOGFIRE_CONSOLE=false`.
 - Optional `GITHUB_TOKEN` to reduce GitHub API rate-limit risk.
 - YAML prompt layers through `PROMPT_CONFIG`, defaulting to `prompts/agent.yaml`.
+- Pydantic settings for `.env` and shell environment parsing.
 
 The agent exposes four tools:
 
@@ -48,9 +49,10 @@ Logfire spans should wrap each agent turn and each tool call.
 `cloudbees-agent` starts a chat loop.
 The user can keep asking questions until `/exit` or `/quit`.
 The first user message must mention a repository as `owner/name` or a GitHub URL.
-If a later message mentions a different repository, the CLI switches to that repository and starts a fresh conversation.
+If a later message mentions a different repository, the CLI switches the active repository and keeps the same conversation history.
 Each CLI run should have a session id.
-Code-search clones should be stored under `CLONE_ROOT/<session-id>/<owner-repo>`.
+Code-search clones should be cached under `CLONE_ROOT/<owner-repo>`.
+Session sandboxes should be under `SANDBOX_ROOT/<session-id>/repos/<owner-repo>`.
 
 The chat loop supports:
 

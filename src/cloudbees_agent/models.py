@@ -39,6 +39,7 @@ class FinalAnswer(BaseModel):
 
     answer: str
     evidence_refs: list[str] = Field(default_factory=list)
+    code_refs: list[str] = Field(default_factory=list)
     tool_calls: list[ToolName] = Field(default_factory=list)
     fallback_used: bool = False
     fallback_tool: ToolName | None = None

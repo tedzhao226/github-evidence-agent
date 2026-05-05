@@ -1,11 +1,10 @@
 from collections.abc import Iterable
 import json
-import os
 from pathlib import Path
 import shutil
 import subprocess
 from threading import Lock
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, unquote, urlparse
 from urllib.request import Request, urlopen
 
 from cloudbees_agent.models import EvidenceItem, EvidenceResult, ToolName
@@ -20,28 +19,23 @@ class GitHubEvidenceTools:
 
     api_base = "https://api.github.com"
 
-    def __init__(self, clone_root: Path | None = None) -> None:
-        """Accept an optional clone root for bounded code search."""
+    def __init__(
+        self,
+        clone_root: Path | None = None,
+        sandbox_root: Path | None = None,
+        github_token: str | None = None,
+    ) -> None:
+        """Accept optional cache and sandbox roots for code search."""
         self.clone_root = clone_root or default_clone_root()
+        self.sandbox_root = sandbox_root or default_sandbox_root()
+        self.github_token = github_token
 
-    def run(self, tool: ToolName, repo: str, question: str) -> EvidenceResult:
-        """Dispatch the selected tool name to its concrete evidence lookup."""
-        if tool == ToolName.README:
-            return self.readme(repo, question)
-        if tool == ToolName.ISSUES:
-            return self.issues(repo, question)
-        if tool == ToolName.COMMITS:
-            return self.commits(repo, question)
-        if tool == ToolName.CODE_SEARCH:
-            return self.code_search(repo, question)
-        raise ValueError(f"Unknown tool: {tool}")
-
-    def readme(self, repo: str, question: str) -> EvidenceResult:
-        """Fetch the repository README and return lines matching question terms."""
+    def readme(self, repo: str, query: str) -> EvidenceResult:
+        """Fetch the repository README and return lines matching query terms."""
         payload = self._get_json(f"/repos/{repo}/readme")
         download_url = payload.get("download_url")
         text = self._get_text(download_url) if download_url else ""
-        terms = extract_terms(question)
+        terms = query_terms(query)
         excerpts = relevant_lines(text.splitlines(), terms, limit=6)
         items = [
             EvidenceItem(
@@ -59,9 +53,9 @@ class GitHubEvidenceTools:
             items=items,
         )
 
-    def issues(self, repo: str, question: str) -> EvidenceResult:
-        """Search public GitHub issues for question terms scoped to one repo."""
-        terms = extract_terms(question)
+    def issues(self, repo: str, query: str) -> EvidenceResult:
+        """Search public GitHub issues for query terms scoped to one repo."""
+        terms = query_terms(query)
         query = f"repo:{repo} is:issue " + " ".join(terms[:4])
         payload = self._get_json(f"/search/issues?{urlencode({'q': query, 'per_page': '5'})}")
         items = [
@@ -80,10 +74,10 @@ class GitHubEvidenceTools:
             items=items,
         )
 
-    def commits(self, repo: str, question: str) -> EvidenceResult:
-        """Fetch recent commits and keep messages that match question terms."""
+    def commits(self, repo: str, query: str) -> EvidenceResult:
+        """Fetch recent commits and keep messages that match query terms."""
         payload = self._get_json(f"/repos/{repo}/commits?per_page=10")
-        terms = extract_terms(question)
+        terms = query_terms(query)
         items = []
         for item in payload:
             commit = item.get("commit", {})
@@ -105,14 +99,16 @@ class GitHubEvidenceTools:
             items=items[:5],
         )
 
-    def code_search(self, repo: str, question: str) -> EvidenceResult:
-        """Clone the repo shallowly, search bounded source files, and rank matches."""
-        terms = extract_terms(question)
+    def code_search(self, repo: str, query: str) -> EvidenceResult:
+        """Use cached clones and copy into a session sandbox before searching."""
+        terms = query_terms(query)
         clone_url = f"https://github.com/{repo}.git"
-        target = clone_target_path(repo, self.clone_root)
-        with clone_lock(target):
-            refresh_clone(clone_url, target)
-            candidates = collect_code_matches(repo, target, terms)
+        cache_target = clone_target_path(repo, self.clone_root)
+        sandbox_target = clone_target_path(repo, self.sandbox_root)
+        with clone_lock(cache_target):
+            refresh_clone(clone_url, cache_target)
+            sync_clone_to_sandbox(cache_target, sandbox_target)
+            candidates = collect_code_matches(repo, sandbox_target, terms)
         items = [
             item
             for _, item in sorted(
@@ -146,13 +142,13 @@ class GitHubEvidenceTools:
             return response.read().decode("utf-8", errors="ignore")
 
     def _headers(self) -> dict[str, str]:
-        """Build GitHub request headers, adding GITHUB_TOKEN when available."""
+        """Build GitHub request headers, adding auth when available."""
         headers = {
             "Accept": "application/vnd.github+json",
             "User-Agent": "cloudbees-agent-assessment",
         }
-        if token := os.getenv("GITHUB_TOKEN"):
-            headers["Authorization"] = f"Bearer {token}"
+        if self.github_token:
+            headers["Authorization"] = f"Bearer {self.github_token}"
         return headers
 
 
@@ -169,9 +165,93 @@ def score_match(path: str, line: str, terms: list[str]) -> int:
     return score
 
 
+def split_evidence_refs(
+    evidence: list[EvidenceResult],
+) -> tuple[list[str], list[str]]:
+    """Split references into non-code evidence refs and code search refs."""
+    non_code_refs: list[str] = []
+    code_refs: list[str] = []
+    seen_non_code: set[str] = set()
+    seen_code: set[str] = set()
+
+    for result in evidence:
+        for item in result.items:
+            ref = item.url or item.path or item.title
+            if not ref:
+                continue
+            dedupe_key = _dedupe_key(ref)
+            if result.tool == ToolName.CODE_SEARCH:
+                if dedupe_key in seen_code:
+                    continue
+                seen_code.add(dedupe_key)
+                code_refs.append(ref)
+                continue
+            if dedupe_key in seen_non_code:
+                continue
+            seen_non_code.add(dedupe_key)
+            non_code_refs.append(ref)
+
+    return non_code_refs, code_refs
+
+
+def compact_code_refs(refs: list[str]) -> list[str]:
+    """Convert blob URLs to file:line refs and de-duplicate by file path."""
+    output: list[str] = []
+    seen: set[str] = set()
+    for ref in refs:
+        parsed = _github_file_line_ref(ref)
+        if parsed is None:
+            if ref in seen:
+                continue
+            output.append(ref)
+            seen.add(ref)
+            continue
+        path, line = parsed
+        if path in seen:
+            continue
+        output.append(f"{path}:{line}")
+        seen.add(path)
+    return output
+
+
+def _github_file_line_ref(ref: str) -> tuple[str, str] | None:
+    """Return repository-relative file path and line from a GitHub blob URL."""
+    parsed = urlparse(ref)
+    if parsed.scheme not in {"http", "https"} or parsed.netloc != "github.com":
+        return None
+    parts = parsed.path.split("/")
+    if len(parts) < 6 or parts[3] != "blob" or parts[4] != "HEAD":
+        return None
+    if not parsed.fragment.startswith("L"):
+        return None
+    fragment = parsed.fragment
+    if fragment.startswith("L") and "-" in fragment:
+        line = fragment[1:].split("-", 1)[0]
+    else:
+        line = parsed.fragment[1:]
+    if not line.isdigit():
+        return None
+    rel_path = "/".join(parts[5:])
+    if not rel_path:
+        return None
+    return unquote(rel_path), line
+
+
+def _dedupe_key(ref: str) -> str:
+    key = _github_file_line_ref(ref)
+    if key:
+        return key[0]
+    return ref
+
+
 def default_clone_root() -> Path:
     """Return the repo-local default root for temporary repository clones."""
     return Path.cwd() / "tmp" / "repos"
+
+
+def default_sandbox_root() -> Path:
+    """Return the repo-local default session sandbox root."""
+    return Path.cwd() / "tmp" / "sandbox" / "sessions"
 
 
 def clone_target_path(repo: str, clone_root: Path) -> Path:
@@ -189,8 +269,10 @@ def clone_lock(target: Path) -> Lock:
 
 
 def refresh_clone(clone_url: str, target: Path) -> None:
-    """Create a fresh shallow clone, tolerating stale partial clone directories."""
+    """Create a shallow clone when the cached repository is missing."""
     if target.exists():
+        if (target / ".git").is_dir():
+            return
         shutil.rmtree(target, ignore_errors=True)
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -205,6 +287,14 @@ def refresh_clone(clone_url: str, target: Path) -> None:
             shutil.rmtree(target, ignore_errors=True)
         stderr = exc.stderr.strip() if exc.stderr else str(exc)
         raise RuntimeError(f"git clone failed for {clone_url}: {stderr}") from exc
+
+
+def sync_clone_to_sandbox(cache_path: Path, sandbox_path: Path) -> None:
+    """Synchronize a cached clone into a per-session sandbox directory."""
+    sandbox_path.parent.mkdir(parents=True, exist_ok=True)
+    if sandbox_path.exists():
+        shutil.rmtree(sandbox_path, ignore_errors=True)
+    shutil.copytree(cache_path, sandbox_path, ignore=shutil.ignore_patterns(".git"))
 
 
 def collect_code_matches(repo: str, target: Path, terms: list[str]) -> list[tuple[int, EvidenceItem]]:
@@ -235,9 +325,9 @@ def collect_code_matches(repo: str, target: Path, terms: list[str]) -> list[tupl
     return candidates
 
 
-def extract_terms(question: str) -> list[str]:
-    """Convert a natural-language question into simple evidence search terms."""
-    words = [word.strip(".,?!:;()[]{}\"'").lower() for word in question.split()]
+def query_terms(query: str) -> list[str]:
+    """Convert a model-written query into simple evidence search terms."""
+    words = [word.strip(".,?!:;()[]{}\"'").lower() for word in query.split()]
     stop = {
         "the",
         "and",
@@ -253,11 +343,7 @@ def extract_terms(question: str) -> list[str]:
         "support",
     }
     terms = [word for word in words if len(word) > 2 and word not in stop]
-    if "observability" in question.lower() and "logfire" not in terms:
-        terms.append("logfire")
-    if "tracing" in question.lower() and "trace" not in terms:
-        terms.append("trace")
-    return terms[:8] or ["readme"]
+    return terms[:8]
 
 
 def relevant_lines(lines: Iterable[str], terms: list[str], limit: int) -> list[str]:

@@ -8,6 +8,8 @@ agent:
     Use issues for bug reports, discussions, and user-reported behavior.
     Use commits for recent changes and history.
     Use code_search for implementation-location questions.
+    Every tool call must include a short query written for that tool.
+    Use focused keywords rather than the full user question.
     You may call multiple tools when one source is not enough.
     Call at most three tools per user question.
     Do not call the same tool more than once for one user question.

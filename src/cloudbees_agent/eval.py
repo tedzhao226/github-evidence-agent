@@ -6,6 +6,7 @@ from pydantic_ai.models.function import FunctionModel
 
 from cloudbees_agent.agent import AgentSession
 from cloudbees_agent.models import EvalCase, EvalSummary, ToolName
+from cloudbees_agent.settings import AppSettings
 
 
 class FixtureTools:
@@ -16,10 +17,22 @@ class FixtureTools:
         self.outputs = outputs
         self.calls: list[ToolName] = []
 
-    def run(self, tool: ToolName, repo: str, question: str):
+    def _lookup(self, tool: ToolName, repo: str, query: str):
         """Return fixture evidence for a tool and record that it was selected."""
         self.calls.append(tool)
         return self.outputs[tool]
+
+    def readme(self, repo: str, query: str):
+        return self._lookup(ToolName.README, repo, query)
+
+    def issues(self, repo: str, query: str):
+        return self._lookup(ToolName.ISSUES, repo, query)
+
+    def commits(self, repo: str, query: str):
+        return self._lookup(ToolName.COMMITS, repo, query)
+
+    def code_search(self, repo: str, query: str):
+        return self._lookup(ToolName.CODE_SEARCH, repo, query)
 
 
 def evaluate_cases(cases: list[EvalCase], trace_dir: Path = Path("traces/eval")) -> EvalSummary:
@@ -33,12 +46,17 @@ def evaluate_cases(cases: list[EvalCase], trace_dir: Path = Path("traces/eval"))
     for case in cases:
         tools = FixtureTools(case.mocked_outputs)
         session = AgentSession(
-            repo=case.repo,
             tools=tools,
+            settings=AppSettings(
+                _env_file=None,
+                openai_api_key=None,
+                logfire_token=None,
+                github_token=None,
+            ),
             trace_dir=trace_dir / slug(case.name),
             model=scripted_model(tool_script(case)),
         )
-        answer = session.ask(case.question)
+        answer = session.ask(case.repo, case.question)
 
         if tools.calls and tools.calls[0] == case.expected_first_tool:
             first_tool_hits += 1
@@ -88,15 +106,15 @@ def ratio(count: int, total: int) -> float:
     return round(count / total, 3)
 
 
-def tool_script(case: EvalCase) -> list[str]:
+def tool_script(case: EvalCase) -> list[tuple[str, str]]:
     """Return the deterministic tool calls used for one fixture case."""
     tools = [case.expected_first_tool]
     if case.expected_fallback:
         tools.append(case.expected_fallback)
-    return [tool.value for tool in tools]
+    return [(tool.value, case.mocked_outputs[tool].query) for tool in tools]
 
 
-def scripted_model(tools: list[str]) -> FunctionModel:
+def scripted_model(tools: list[tuple[str, str]]) -> FunctionModel:
     """Return a local model that calls fixture tools in the requested order."""
 
     def call_next(messages, info):
@@ -105,7 +123,8 @@ def scripted_model(tools: list[str]) -> FunctionModel:
             if isinstance(message, ModelRequest):
                 returns.extend(part for part in message.parts if isinstance(part, ToolReturnPart))
         if len(returns) < len(tools):
-            return ModelResponse(parts=[ToolCallPart(tools[len(returns)], {})])
+            tool_name, query = tools[len(returns)]
+            return ModelResponse(parts=[ToolCallPart(tool_name, {"query": query})])
         content = "\n".join(str(part.content) for part in returns)
         return ModelResponse(parts=[TextPart(content)])
 

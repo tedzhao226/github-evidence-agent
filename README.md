@@ -1,36 +1,47 @@
 # CloudBees GitHub Evidence Agent
 
-This is a small CLI agent for the CloudBees Agentic Software Engineer assessment.
-Given a public GitHub repository, it supports a long-running chat session, calls read-only GitHub evidence tools, and answers from the evidence it found.
+This is a small CLI for repository code research.
+Given a public GitHub repository, it runs a long-running chat session, calls read-only evidence tools, and answers from the collected evidence.
+The implementation uses Pydantic AI with OpenAI when credentials are present, and offline test models when they are not.
 
-I used Pydantic AI because the assignment values typed agent behavior and tool calls.
-The live path uses OpenAI through Pydantic AI when `OPENAI_API_KEY` is present.
-Offline tests use fixture tools and Pydantic AI test models, so default checks do not call live APIs.
+## In This README
 
-## Run
+- [Demo](#demo)
+- [Run Commands](#run-commands)
+- [Configuration](#configuration)
+- [Chat Commands](#chat-commands)
+- [Output Format](#output-format)
+- [Agent Behavior](#agent-behavior)
+- [Failure Handling](#failure-handling)
+- [Evals](#evals)
+- [Smoke Checks](#smoke-checks)
+- [Assumptions and Limits](#assumptions-and-limits)
+
+## Demo
+
+```bash
+cloudbees-agent
+For fastapi/fastapi, where is routing implemented?
+```
+
+![chat cli demo](docs/imgs/chat-cli.png)
+
+## Run Commands
+
+Start interactive chat:
 
 ```bash
 make setup
 make chat
 ```
 
-One-shot mode is still available for samples and scripts:
+Run one-shot mode:
 
 ```bash
-make run PROMPT="For pydantic/pydantic-ai, how does this repository support observability or tracing, and where is that implemented?"
+make run PROMPT="For fastapi/fastapi, where is routing implemented?"
 ```
 
-Environment:
-
-- `OPENAI_API_KEY`: enables the live Pydantic AI agent.
-- `OPENAI_MODEL`: optional, defaults to `openai:gpt-5-mini`.
-- `LOGFIRE_TOKEN`: optional, sends spans to hosted Logfire when present.
-- `LOGFIRE_CONSOLE`: optional, defaults to `false` so chat mode stays quiet.
-- `GITHUB_TOKEN`: optional, reduces GitHub API rate-limit risk.
-- `CLONE_ROOT`: optional base directory, defaults to `tmp/repos`.
-- `PROMPT_CONFIG`: optional, defaults to `prompts/agent.yaml`.
-
-Useful commands:
+Useful maintenance commands:
 
 ```bash
 make test
@@ -42,51 +53,101 @@ make sample
 `make sample` writes `sample_run.txt`.
 Each turn writes trace JSON under `traces/`.
 
-`make test` is offline and deterministic.
-`make smoke` must be triggered manually; it loads `.env`, calls real OpenAI and GitHub services, and flushes Logfire spans when `LOGFIRE_TOKEN` is set.
-Smoke tests are intended for local checks, not default CI.
+## Configuration
 
-## Agent Flow
+Set these environment values as needed.
+Values are parsed once through the Pydantic settings loader.
 
-See [docs/architecture.md](docs/architecture.md) for the design walkthrough.
-The agent prompt layers live in [prompts/agent.yaml](prompts/agent.yaml).
+- `OPENAI_API_KEY`: enables the live Pydantic AI agent.
+- `OPENAI_MODEL`: optional, defaults to `openai:gpt-5-mini`.
+- `LOGFIRE_TOKEN`: optional, sends spans to hosted Logfire when present.
+- `TRACE_BACKEND`: optional, controls trace persistence:
+  - `both` (default): write local trace JSON and emit remote Logfire trace event when `LOGFIRE_TOKEN` is set.
+  - `local`: write local trace JSON only.
+  - `remote`: emit remote Logfire trace event only when `LOGFIRE_TOKEN` is set.
+- `LOGFIRE_CONSOLE`: optional, defaults to `false` so chat mode stays quiet.
+- `GITHUB_TOKEN`: optional, reduces GitHub API rate-limit risk.
+- `CLONE_ROOT`: optional base directory, defaults to `tmp/repos`.
+- `SANDBOX_ROOT`: optional base directory for session sandboxes, defaults to `tmp/sandbox/sessions`.
+- `PROMPT_CONFIG`: optional, defaults to `prompts/agent.yaml`.
 
-The agent has four read-only evidence tools:
+## Chat Commands
 
-- README lookup through the GitHub API.
-- Issues lookup through the GitHub API.
-- Recent commits lookup through the GitHub API.
-- Bounded code search through a temporary shallow clone.
-
-The CLI has two modes:
+The CLI has two modes.
 
 - `cloudbees-agent` starts a chat loop.
 - `cloudbees-agent "For owner/name, ..."` runs one turn.
 
-The chat loop supports `/help`, `/clear`, `/exit`, and `/quit`.
-Conversation history is kept in memory for the current process.
-The first question must mention a repository as `owner/name` or a GitHub URL.
-If a later message mentions a different repository, the CLI switches to that repo and starts a fresh conversation.
-Each CLI run has a session id.
-Code-search clones are written under `CLONE_ROOT/<session-id>/<owner-repo>` so concurrent conversations do not share clone directories.
+In chat mode, use:
 
-## Failure Mode
+- `/help` to show available commands.
+- `/clear` to reset in-memory conversation history for the current CLI session.
+- `/exit` to leave the chat.
+- `/quit` to leave the chat.
 
-The demonstrated failure mode is weak or empty first evidence.
-If the first tool returns no relevant items and a later tool finds evidence, the trace records the later tool as a fallback.
-The agent should report uncertainty when tools do not return enough evidence.
+The first message must include a repository as `owner/name` or a GitHub URL.
+If a later message references a different repository, the session switches the active repository and keeps the same in-memory conversation.
+
+Unknown slash commands print a short hint and continue the chat.
+
+## Output Format
+
+Each answer prints three key sections.
+
+- `Tool calls`: tool chain used to gather evidence.
+- `Evidence refs`: raw evidence links or path references.
+- `Code refs`: compact file and line references such as `path:line`.
+
+Example output:
+
+```text
+Tool calls: readme, code_search
+
+Answer:
+Tracing is documented in the repository README and code.
+
+Evidence refs:
+- https://github.com/fastapi/fastapi/blob/HEAD/fastapi/routing.py#L35
+- https://github.com/fastapi/fastapi/blob/HEAD/fastapi/applications.py#L6
+
+Code refs:
+- fastapi/routing.py:35
+- fastapi/applications.py:6
+
+Fallback used: False
+Session ID: 20260101T120000Z-abc12345
+Trace JSON: traces/session-id/owner-repo-turn-1-20260101T120000Z.json
+```
+
+## Agent Behavior
+
+See [docs/architecture.md](docs/architecture.md) for the design walkthrough.
+The agent prompt layers live in [prompts/agent.yaml](prompts/agent.yaml).
+
+Evidence tools are read-only:
+
+- README lookup via GitHub API.
+- Issues lookup via GitHub API.
+- Recent commits lookup via GitHub API.
+- Bounded local code search through a shallow clone.
+
+The model writes a focused `query` for each tool call.
+The tool backend uses that query directly instead of deriving search text from the full user question.
+
+Code-search clones are cached under `CLONE_ROOT/<owner-repo>`.
+Each session searches against its own copy in
+`SANDBOX_ROOT/<session-id>/repos/<owner-repo>`.
+
+## Failure Handling
+
+The failure path is weak first evidence.
+If the first tool returns nothing and a later tool finds useful evidence, the trace marks the later tool as fallback.
+The final answer includes uncertainty when evidence is not strong.
 
 ## Evals
 
-The eval suite is fixture-backed and does not call GitHub or OpenAI.
+The suite is fixture-backed and does not call GitHub or OpenAI.
 It covers README, issues, commits, code search, and fallback behavior.
-
-Metrics:
-
-- First tool correctness.
-- Fallback correctness.
-- Grounded answer rate.
-- Trace completeness.
 
 Run:
 
@@ -94,17 +155,19 @@ Run:
 make eval
 ```
 
-## Smoke Tests
+## Smoke Checks
 
-Create a local `.env` from `.env.example` and fill in real values:
+Create `.env` from `.env.example` and set real values.
 
 ```bash
 OPENAI_API_KEY=...
-LOGFIRE_TOKEN=...
-LOGFIRE_CONSOLE=false
-GITHUB_TOKEN=...
 OPENAI_MODEL=openai:gpt-5-mini
+GITHUB_TOKEN=...
+LOGFIRE_TOKEN=...
+TRACE_BACKEND=both
+LOGFIRE_CONSOLE=false
 CLONE_ROOT=tmp/repos
+SANDBOX_ROOT=tmp/sandbox/sessions
 PROMPT_CONFIG=prompts/agent.yaml
 ```
 
@@ -114,15 +177,14 @@ Then run:
 make smoke
 ```
 
-The smoke suite has two checks:
-
-- Real Pydantic AI/OpenAI agent turn with tools.
-- Real multi-turn agent run with GitHub evidence and Logfire `force_flush()`.
+`make smoke` is not run by default CI.
+It loads `.env`, calls real OpenAI and GitHub services, and flushes Logfire spans when `LOGFIRE_TOKEN` is set.
 
 ## Assumptions and Limits
 
 Only public GitHub repositories are in scope.
-The tool never performs GitHub writes.
+The tool never writes to GitHub.
 Code search uses a temporary shallow clone and skips common vendor/build directories.
-By default, fresh code-search clones are written under `tmp/repos/<session-id>/<owner-repo>`.
-The final answer is intentionally compact and evidence-first rather than polished prose.
+By default, fresh code-search clones are written under `tmp/repos/<owner-repo>`.
+Session sandbox copies are written under `tmp/sandbox/sessions/<session-id>/repos/<owner-repo>`.
+The final answer is intentionally compact and evidence-first.

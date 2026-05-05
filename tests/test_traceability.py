@@ -1,13 +1,25 @@
 import json
 
 from cloudbees_agent.models import EvidenceItem, EvidenceResult, ToolName
+from cloudbees_agent.settings import AppSettings
 from cloudbees_agent.traceability import (
     configure_logfire,
     evidence_refs,
     judge_fallback,
+    record_turn_trace,
     trace_path,
     write_local_trace,
 )
+
+
+def settings_for_test(**overrides) -> AppSettings:
+    values = {
+        "openai_api_key": None,
+        "logfire_token": None,
+        "github_token": None,
+    }
+    values.update(overrides)
+    return AppSettings(_env_file=None, **values)
 
 
 def evidence(tool: ToolName, text: str) -> EvidenceResult:
@@ -54,6 +66,32 @@ def test_evidence_refs_collects_urls_paths_and_titles():
     assert refs == ["https://example.test/ref", "src/ref.py", "title only"]
 
 
+def test_evidence_refs_deduplicates_duplicate_file_lines():
+    result = EvidenceResult(
+        tool=ToolName.CODE_SEARCH,
+        query="routing",
+        summary="duplicate lines",
+        items=[
+            EvidenceItem(
+                kind="code",
+                title="routing.py:35",
+                url="https://github.com/fastapi/fastapi/blob/HEAD/fastapi/routing.py#L35",
+                excerpt="first",
+            ),
+            EvidenceItem(
+                kind="code",
+                title="routing.py:80",
+                url="https://github.com/fastapi/fastapi/blob/HEAD/fastapi/routing.py#L80",
+                excerpt="second",
+            ),
+        ],
+    )
+
+    refs = evidence_refs([result])
+
+    assert refs == ["https://github.com/fastapi/fastapi/blob/HEAD/fastapi/routing.py#L35"]
+
+
 def test_write_local_trace_records_turn_metadata(tmp_path):
     path = trace_path(tmp_path, "session-123", "owner/repo", 2)
 
@@ -79,21 +117,145 @@ def test_write_local_trace_records_turn_metadata(tmp_path):
     assert payload["evidence_summary"] == "README documents tracing."
 
 
+def test_record_turn_trace_writes_local_and_skips_remote_without_token(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr("logfire.info", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    path = trace_path(tmp_path, "session-123", "owner/repo", 1)
+    record_turn_trace(
+        settings=settings_for_test(),
+        path=path,
+        repo="owner/repo",
+        question="Where is tracing?",
+        session_id="session-123",
+        tool_calls=[ToolName.README],
+        evidence=[evidence(ToolName.README, "README documents tracing.")],
+        final_answer="Tracing is documented.",
+        fallback_tool=None,
+        fallback_reason=None,
+        conversation_turn=1,
+    )
+
+    assert path.exists()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["conversation_turn"] == 1
+    assert not calls
+
+
+def test_record_turn_trace_sends_remote_when_token_present(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr("logfire.info", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    path = trace_path(tmp_path, "session-123", "owner/repo", 1)
+    record_turn_trace(
+        settings=settings_for_test(logfire_token="token"),
+        path=path,
+        repo="owner/repo",
+        question="Where is tracing?",
+        session_id="session-123",
+        tool_calls=[ToolName.README],
+        evidence=[evidence(ToolName.README, "README documents tracing.")],
+        final_answer="Tracing is documented.",
+        fallback_tool=None,
+        fallback_reason=None,
+        conversation_turn=1,
+    )
+
+    assert path.exists()
+    assert calls
+
+
+def test_record_turn_trace_can_force_local_with_token(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr("logfire.info", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    path = trace_path(tmp_path, "session-123", "owner/repo", 1)
+    record_turn_trace(
+        settings=settings_for_test(logfire_token="token", trace_backend="local"),
+        path=path,
+        repo="owner/repo",
+        question="Where is tracing?",
+        session_id="session-123",
+        tool_calls=[ToolName.README],
+        evidence=[evidence(ToolName.README, "README documents tracing.")],
+        final_answer="Tracing is documented.",
+        fallback_tool=None,
+        fallback_reason=None,
+        conversation_turn=1,
+    )
+
+    assert path.exists()
+    assert not calls
+
+
+def test_record_turn_trace_can_force_remote_without_local(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr("logfire.info", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    path = trace_path(tmp_path, "session-123", "owner/repo", 1)
+    record_turn_trace(
+        settings=settings_for_test(logfire_token="token", trace_backend="remote"),
+        path=path,
+        repo="owner/repo",
+        question="Where is tracing?",
+        session_id="session-123",
+        tool_calls=[ToolName.README],
+        evidence=[evidence(ToolName.README, "README documents tracing.")],
+        final_answer="Tracing is documented.",
+        fallback_tool=None,
+        fallback_reason=None,
+        conversation_turn=1,
+    )
+
+    assert not path.exists()
+    assert calls
+
+
+def test_record_turn_trace_remote_backend_requires_token(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr("logfire.info", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    path = trace_path(tmp_path, "session-123", "owner/repo", 1)
+    record_turn_trace(
+        settings=settings_for_test(trace_backend="remote"),
+        path=path,
+        repo="owner/repo",
+        question="Where is tracing?",
+        session_id="session-123",
+        tool_calls=[ToolName.README],
+        evidence=[evidence(ToolName.README, "README documents tracing.")],
+        final_answer="Tracing is documented.",
+        fallback_tool=None,
+        fallback_reason=None,
+        conversation_turn=1,
+    )
+
+    assert not path.exists()
+    assert not calls
+
+
 def test_configure_logfire_disables_console_by_default(monkeypatch):
     calls = []
-    monkeypatch.delenv("LOGFIRE_CONSOLE", raising=False)
     monkeypatch.setattr("logfire.configure", lambda **kwargs: calls.append(kwargs))
 
-    configure_logfire()
+    configure_logfire(settings_for_test())
 
-    assert calls == [{"send_to_logfire": "if-token-present", "console": False}]
+    assert calls == [{"send_to_logfire": False, "token": None, "console": False}]
 
 
 def test_configure_logfire_allows_console_when_enabled(monkeypatch):
     calls = []
-    monkeypatch.setenv("LOGFIRE_CONSOLE", "true")
     monkeypatch.setattr("logfire.configure", lambda **kwargs: calls.append(kwargs))
 
-    configure_logfire()
+    configure_logfire(settings_for_test(logfire_console=True))
 
-    assert calls == [{"send_to_logfire": "if-token-present", "console": None}]
+    assert calls == [{"send_to_logfire": False, "token": None, "console": None}]
+
+
+def test_configure_logfire_sends_remote_when_token_present(monkeypatch):
+    calls = []
+    monkeypatch.setattr("logfire.configure", lambda **kwargs: calls.append(kwargs))
+
+    configure_logfire(settings_for_test(logfire_token="token"))
+
+    assert calls == [{"send_to_logfire": True, "token": "token", "console": False}]
